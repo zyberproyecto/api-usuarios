@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace App\Http\Controllers;
 
@@ -9,78 +9,76 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /** Busca usuario por email o por CI estricta (7–8 dígitos) */
+    private function findUserByLogin(string $login): ?Usuario
+    {
+        $login = trim($login);
+
+        // Si es email, buscamos por email
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            return Usuario::where('email', $login)->first();
+        }
+
+        // Si NO es email, debe ser CI estricta (solo 7–8 dígitos, sin puntos ni guiones)
+        if (!preg_match('/^\d{7,8}$/', $login)) {
+            // error de formato (rechazar entradas con puntos/guiones/letras)
+            throw ValidationException::withMessages([
+                'login' => 'La CI debe ingresarse sin puntos ni guiones (solo 7 u 8 dígitos).',
+            ]);
+        }
+
+        // Comparamos contra la CI en BD reducida a dígitos (MySQL 8)
+        // Ej: "4.321.987-6" -> "43219876"
+        return Usuario::whereRaw(
+            "REGEXP_REPLACE(ci_usuario, '[^0-9]', '') = ?",
+            [$login]
+        )->first();
+    }
+
     /**
-     * Login por email o CI (ci_usuario).
-     * Devuelve token Sanctum con abilities según el rol.
+     * Login SOLO para socios (por email o CI estricta).
+     * Requisitos:
+     *  - rol = 'socio'
+     *  - estado_registro = 'aprobado'
+     * Devuelve token Sanctum con ability ['socio'].
      */
     public function login(Request $request)
     {
         $data = $request->validate([
-            'login'    => 'required|string',
-            'password' => 'required|string',
+            'login'    => ['required','string'],
+            'password' => ['required','string'],
         ]);
 
-        $login = trim($data['login']);
-        $pass  = $data['password'];
+        // Buscar usuario
+        $user = $this->findUserByLogin($data['login']);
 
-        // --------- 1) ADMIN ----------
-        $admin = Usuario::query()
-            ->where('rol', 'admin')
-            ->where(function ($q) use ($login) {
-                $q->where('email', $login)
-                  ->orWhere('ci_usuario', $login);
-            })
-            ->first();
-
-        if ($admin && $this->passwordMatch($pass, $admin->password)) {
-            $estado = $admin->estado_registro ?? $admin->estado ?? null;
-            if (!$this->isApproved($estado)) {
-                return response()->json([
-                    'ok'     => false,
-                    'error'  => 'Usuario no aprobado aún.',
-                    'estado' => $estado ?? 'pendiente',
-                ], 403);
-            }
-
-            // ability para rutas admin en api-cooperativa / backoffice
-            $token = $admin->createToken('api', ['admin'])->plainTextToken;
-
-            return response()->json([
-                'ok'    => true,
-                'token' => $token,
-                'user'  => [
-                    'id'         => $admin->id,
-                    'rol'        => 'admin',
-                    'estado'     => $estado ?? 'aprobado',
-                    'ci_usuario' => $admin->ci_usuario,
-                    'email'      => $admin->email,
-                    'nombre'     => $admin->nombre
-                                    ?? ($admin->primer_nombre ?? null)
-                                    ?? ($admin->name ?? null),
-                ],
-            ]);
-        }
-
-        // --------- 2) USUARIO / SOCIO ----------
-        $socio = Usuario::query()
-            ->where('ci_usuario', $login)
-            ->orWhere('email', $login)
-            ->first();
-
-        if (!$socio) {
+        if (!$user) {
             throw ValidationException::withMessages([
                 'login' => 'Usuario no encontrado.',
             ]);
         }
 
-        if (!$this->passwordMatch($pass, $socio->password)) {
+        // Password (solo hash válido de Laravel)
+        if (!Hash::check($data['password'], (string) $user->password)) {
             throw ValidationException::withMessages([
-                'login' => 'Credenciales inválidas.',
+                'password' => 'Credenciales inválidas.',
             ]);
         }
 
-        $estado = $socio->estado_registro ?? $socio->estado ?? null;
-        if (!$this->isApproved($estado)) {
+        // 🔒 Solo socios
+        if (mb_strtolower((string)($user->rol ?? '')) !== 'socio') {
+            return response()->json([
+                'ok'   => false,
+                'error'=> 'Solo socios pueden iniciar sesión.',
+            ], 403);
+        }
+
+        // 🔒 Solo aprobados (acepta sinónimos comunes)
+        $estado     = $user->estado_registro ?? $user->estado ?? null;
+        $estadoNorm = $estado ? mb_strtolower($estado) : null;
+        $aprobado   = in_array($estadoNorm, ['aprobado','aprobada','ok','activo','activa'], true);
+
+        if (!$aprobado) {
             return response()->json([
                 'ok'     => false,
                 'error'  => 'Usuario no aprobado aún.',
@@ -88,86 +86,55 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // 👉 usar el rol real del usuario encontrado
-        $rol = $socio->rol ?: 'socio';
-        $ability = ($rol === 'admin') ? 'admin' : 'socio';
-
-        $token = $socio->createToken('api', [$ability])->plainTextToken;
+        // Token con ability 'socio'
+        $token = $user->createToken('socio-token', ['socio'])->plainTextToken;
 
         return response()->json([
             'ok'    => true,
             'token' => $token,
             'user'  => [
-                'id'           => $socio->id,
-                'rol'          => $rol,
-                'estado'       => $estado ?? 'aprobado',
-                'ci_usuario'   => $socio->ci_usuario,
-                'email'        => $socio->email,
-                'nombre'       => $socio->nombre
-                                   ?? ($socio->primer_nombre ?? null)
-                                   ?? ($socio->name ?? null),
+                'id'         => $user->id ?? null,
+                'rol'        => 'socio',
+                'estado'     => $estadoNorm ?? 'aprobado',
+                'ci_usuario' => $user->ci_usuario,
+                'email'      => $user->email,
+                'nombre'     => $user->nombre
+                                  ?? ($user->primer_nombre ?? null)
+                                  ?? ($user->name ?? null),
             ],
         ]);
     }
 
-    /**
-     * Datos del usuario autenticado.
-     */
+    /** Perfil del usuario autenticado (token Sanctum) */
     public function me(Request $request)
     {
         $u = $request->user();
-        if (!$u) {
-            return response()->json(['ok' => false], 401);
-        }
+        if (!$u) return response()->json(['ok' => false], 401);
 
         $estado = $u->estado_registro ?? $u->estado ?? 'aprobado';
 
         return response()->json([
             'ok'   => true,
             'user' => [
-                'id'         => $u->id,
-                'rol'        => strtolower((string)($u->rol ?? 'socio')),
+                'id'         => $u->id ?? null,
+                'rol'        => 'socio',
                 'estado'     => $estado,
                 'ci_usuario' => $u->ci_usuario ?? null,
                 'email'      => $u->email ?? null,
                 'nombre'     => $u->nombre
-                                ?? ($u->primer_nombre ?? null)
-                                ?? ($u->name ?? null),
+                                  ?? ($u->primer_nombre ?? null)
+                                  ?? ($u->name ?? null),
             ],
         ]);
     }
 
-    /**
-     * Logout del token actual.
-     */
+    /** Logout del token actual */
     public function logout(Request $request)
     {
         $user = $request->user();
         if ($user && $user->currentAccessToken()) {
             $user->currentAccessToken()->delete();
         }
-
         return response()->json(['ok' => true]);
-    }
-
-    // ----------------- Helpers -----------------
-
-    private function passwordMatch(string $plain, ?string $stored): bool
-    {
-        if (!$stored) {
-            return false;
-        }
-        // Soporta hashed y texto plano (para ambientes de prueba)
-        return Hash::check($plain, $stored) || hash_equals($stored, $plain);
-    }
-
-    private function isApproved(?string $estado): bool
-    {
-        if (!$estado) {
-            // Si no hay columna en la versión actual, dejamos pasar (compat)
-            return true;
-        }
-        $e = mb_strtolower($estado);
-        return in_array($e, ['aprobado', 'aprobada', 'ok', 'activo', 'activa'], true);
     }
 }
