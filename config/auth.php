@@ -3,17 +3,18 @@
 return [
 
     'defaults' => [
-        'guard' => 'web',
+        'guard' => 'api',      // API por defecto (Sanctum)
         'passwords' => 'users',
     ],
 
     'guards' => [
+        // Guard de sesión (lo podés dejar por compatibilidad)
         'web' => [
             'driver'   => 'session',
             'provider' => 'users',
         ],
 
-        // Guard explícito para APIs con Sanctum (tokens personales)
+        // Guard para APIs con Sanctum (tokens personales)
         'api' => [
             'driver'   => 'sanctum',
             'provider' => 'users',
@@ -23,7 +24,7 @@ return [
     'providers' => [
         'users' => [
             'driver' => 'eloquent',
-            'model'  => \App\Models\Usuario::class,
+            'model'  => \App\Models\Usuario::class, // <- tu modelo de socios
         ],
     ],
 

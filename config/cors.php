@@ -6,7 +6,6 @@ return [
     |--------------------------------------------------------------------------
     | Paths
     |--------------------------------------------------------------------------
-    | Aplicá CORS a todas las rutas del API y al endpoint de CSRF (por si se usa).
     */
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
@@ -57,7 +56,6 @@ return [
     |--------------------------------------------------------------------------
     | Max Age
     |--------------------------------------------------------------------------
-    | Cache del preflight (segundos).
     */
     'max_age' => 3600,
 
@@ -65,7 +63,6 @@ return [
     |--------------------------------------------------------------------------
     | Supports Credentials
     |--------------------------------------------------------------------------
-    | Usamos Bearer tokens (Sanctum personal access tokens), no cookies cruzadas.
     */
     'supports_credentials' => false,
 
