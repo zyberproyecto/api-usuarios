@@ -5,20 +5,27 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up(): void {
-        Schema::create('personal_access_tokens', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->morphs('tokenable'); // {tokenable_type, tokenable_id}
-            $table->string('name');
-            $table->string('token', 64)->unique();
-            $table->text('abilities')->nullable();
-            $table->timestamp('last_used_at')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->timestamps();
+    public function up(): void
+    {
+        Schema::create('personal_access_tokens', function (Blueprint $t) {
+            $t->id();
+
+            // IMPORTANTE: tokenable_id como STRING porque usuarios.ci_usuario es string
+            $t->string('tokenable_type');
+            $t->string('tokenable_id');                      // <- antes era BIGINT
+            $t->index(['tokenable_type', 'tokenable_id']);
+
+            $t->string('name');
+            $t->string('token', 64)->unique();               // Sanctum guarda hash de 64 chars
+            $t->text('abilities')->nullable();
+            $t->timestamp('last_used_at')->nullable();
+            $t->timestamp('expires_at')->nullable();
+            $t->timestamps();
         });
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('personal_access_tokens');
     }
 };
