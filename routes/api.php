@@ -18,9 +18,17 @@ Route::post('/register', [SolicitudController::class, 'store'])->name('register'
 // Login único de socios (por CI sin puntos ni guiones, o por email)
 Route::post('/login', [AuthController::class, 'login'])->name('login');
 
-// Rutas protegidas con token Sanctum
+// ---------------- RUTAS PROTEGIDAS (token Sanctum) ----------------
 Route::middleware('auth:sanctum')->group(function () {
+
+    // Básico (igual que antes)
     Route::get('/me',      [AuthController::class, 'me'])->name('me');
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
-    Route::get('/perfil',  [PerfilController::class, 'perfil'])->name('perfil'); // alias de /me
+
+    // Alias básico original (lo movemos a /perfil/basic para no romper nada)
+    Route::get('/perfil/basic', [PerfilController::class, 'perfil'])->name('perfil.basic');
+
+    // NUEVO: Perfil extendido
+    Route::get('/perfil', [PerfilController::class, 'show'])->name('perfil.show');     // devuelve usuario + usuarios_perfil
+    Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update'); // crea/actualiza y deja 'pendiente'
 });
