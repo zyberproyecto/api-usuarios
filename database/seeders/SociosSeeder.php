@@ -10,23 +10,20 @@ class SociosSeeder extends Seeder
 {
     public function run(): void
     {
-        // Helper para construir password: 3 primeras letras del nombre + 123
         $pwd = fn (string $nombre) => strtolower(mb_substr($nombre, 0, 3)) . '123';
 
-        // Socio APROBADO (puede loguear)
         Usuario::updateOrCreate(
-            ['ci_usuario' => '22222222'], // usa tu formato/validación real
+            ['ci_usuario' => '22222222'], 
             [
                 'primer_nombre'   => 'Valentina',
                 'primer_apellido' => 'Méndez',
                 'email'           => 'socio.aprobado@zyber.test',
                 'password'        => Hash::make($pwd('Valentina')), // val123
                 'estado_registro' => 'aprobado',
-                'rol'             => 'socio', // si tu tabla tiene este campo
+                'rol'             => 'socio', 
             ]
         );
 
-        // Socio PENDIENTE (no debe poder loguear)
         Usuario::updateOrCreate(
             ['ci_usuario' => '33333333'],
             [
@@ -39,7 +36,6 @@ class SociosSeeder extends Seeder
             ]
         );
 
-        // (Opcional) Socio RECHAZADO
         Usuario::updateOrCreate(
             ['ci_usuario' => '44444444'],
             [

@@ -9,14 +9,11 @@ use App\Models\Usuario;
 
 class SolicitudController extends Controller
 {
-    // POST /api/register  (desde la Landing)
     public function store(Request $request)
 {
-    // Normalizar CI desde 'ci' o 'ci_usuario'
     $ci = $request->input('ci') ?? $request->input('ci_usuario');
     $ci = $ci ? preg_replace('/\D/', '', (string) $ci) : null;
 
-    // Mapear nombres “viejos” de la landing a los de la BD
     $request->merge([
         'ci'               => $ci,
         'nombre_completo'  => $request->input('nombre_completo') ?? $request->input('nombre'),
@@ -24,8 +21,6 @@ class SolicitudController extends Controller
         'comentarios'      => $request->input('comentarios') ?? $request->input('intereses') ?? $request->input('mensaje'),
     ]);
 
-    // ❗ Bloqueo si ya existe un USUARIO con esa CI o email.
-    //     (la CI en usuarios puede tener puntos/guiones: comparamos normalizada)
     $email = $request->input('email');
     $existeUsuario = Usuario::query()
         ->when($ci, fn($q) => $q->orWhereRaw("REPLACE(REPLACE(ci_usuario,'.',''),'-','') = ?", [$ci]))
@@ -39,7 +34,6 @@ class SolicitudController extends Controller
         ], 422);
     }
 
-    // Validación (evita duplicar solicitudes PENDIENTES por email/CI)
     $validated = $request->validate([
         'ci'               => ['nullable','digits_between:7,8',
             \Illuminate\Validation\Rule::unique('solicitudes','ci')

@@ -7,9 +7,7 @@ use Illuminate\Http\Request;
 
 class PerfilController extends Controller
 {
-    /**
-     * Alias de /me. Devuelve datos básicos del usuario autenticado.
-     */
+
     public function perfil(Request $request)
     {
         $u = $request->user();
@@ -17,7 +15,7 @@ class PerfilController extends Controller
             return response()->json(['ok' => false], 401);
         }
 
-        $rol    = 'socio'; // Esta API es solo para socios
+        $rol    = 'socio'; 
         $estado = $u->estado_registro ?? $u->estado ?? 'aprobado';
 
         return response()->json([
@@ -36,10 +34,6 @@ class PerfilController extends Controller
         ]);
     }
 
-    /**
-     * GET /api/perfil (auth:sanctum)
-     * Datos básicos + perfil extendido (si no existe, fields=null y estado_revision='incompleto').
-     */
     public function show(Request $request)
     {
         $u = $request->user();
@@ -47,13 +41,11 @@ class PerfilController extends Controller
             return response()->json(['ok' => false, 'message' => 'No autenticado'], 401);
         }
 
-        // CI normalizada (solo dígitos)
         $ci = preg_replace('/\D/', '', (string)($u->ci_usuario ?? $u->ci ?? ''));
         if ($ci === '') {
             return response()->json(['ok' => false, 'message' => 'Usuario inválido'], 401);
         }
 
-        // Evitamos depender del primaryKey del modelo
         $perfil = UsuarioPerfil::where('ci_usuario', $ci)->first();
 
         return response()->json([
@@ -81,12 +73,7 @@ class PerfilController extends Controller
         ]);
     }
 
-    /**
-     * PUT /api/perfil (auth:sanctum)
-     * Crea/actualiza el perfil extendido. TODOS los campos son obligatorios.
-     * Cada edición vuelve el estado a 'pendiente' para revisión del Backoffice.
-     */
-    public function update(Request $request)
+   public function update(Request $request)
     {
         $u = $request->user();
         if (!$u) {

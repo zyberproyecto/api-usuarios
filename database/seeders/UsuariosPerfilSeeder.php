@@ -11,7 +11,6 @@ class UsuariosPerfilSeeder extends Seeder
     {
         $now = now();
 
-        // APROBADO 22222222
         DB::table('usuarios_perfil')->updateOrInsert(
             ['ci_usuario' => '22222222'],
             [
@@ -30,7 +29,6 @@ class UsuariosPerfilSeeder extends Seeder
             ]
         );
 
-        // PENDIENTE 33333333
         DB::table('usuarios_perfil')->updateOrInsert(
             ['ci_usuario' => '33333333'],
             [
@@ -49,7 +47,6 @@ class UsuariosPerfilSeeder extends Seeder
             ]
         );
 
-        // RECHAZADO 44444444
         DB::table('usuarios_perfil')->updateOrInsert(
             ['ci_usuario' => '44444444'],
             [

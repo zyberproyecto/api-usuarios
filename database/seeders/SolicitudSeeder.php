@@ -11,7 +11,6 @@ class SolicitudSeeder extends Seeder
     {
         $now = now();
 
-        // Solicitud PENDIENTE para 33333333 (existe usuario pendiente)
        DB::table('solicitudes')->insertOrIgnore([
   [
     'ci'              => '33333333',
