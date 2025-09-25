@@ -26,20 +26,7 @@ class SolicitudSeeder extends Seeder
     'created_at'      => $now,
     'updated_at'      => $now,
   ],
-  [
-    'ci'              => '55555555',
-    'nombre_completo' => 'Nuevo Postulante',
-    'email'           => 'nuevo@postulante.test',
-    'telefono'        => '097555555',
-    'menores_a_cargo' => 0,
-    'dormitorios'     => 2,
-    'comentarios'     => 'Me interesa 2 dormitorios.',
-    'estado'          => 'pendiente',
-    'aprobado_por'    => null,
-    'aprobado_at'     => null,
-    'created_at'      => $now,
-    'updated_at'      => $now,
-  ],
+  
 ]);
      
     }
