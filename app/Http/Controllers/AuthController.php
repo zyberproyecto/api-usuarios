@@ -13,23 +13,27 @@ class AuthController extends Controller
     {
         $login = trim($login);
 
-      
+        // Si parece email, buscamos por email
         if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
             return Usuario::where('email', $login)->first();
         }
 
-        if (!preg_match('/^\d{7,8}$/', $login)) {
+        // Caso CI: solo dígitos (7 u 8)
+        $digits = preg_replace('/\D/', '', $login);
+        if (!preg_match('/^\d{7,8}$/', $digits)) {
             throw ValidationException::withMessages([
                 'login' => 'La CI debe ingresarse sin puntos ni guiones (solo 7 u 8 dígitos).',
             ]);
         }
+
+        // Compatibilidad MariaDB/MySQL sin REGEXP_REPLACE
+        // Normaliza ci_usuario quitando '.', '-', y espacios.
         return Usuario::whereRaw(
-            "REGEXP_REPLACE(ci_usuario, '[^0-9]', '') = ?",
-            [$login]
+            "REPLACE(REPLACE(REPLACE(ci_usuario, '.', ''), '-', ''), ' ', '') = ?",
+            [$digits]
         )->first();
     }
 
-    
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -51,6 +55,7 @@ class AuthController extends Controller
             ]);
         }
 
+        // Solo rol socio puede iniciar sesión en este front
         if (mb_strtolower((string)($user->rol ?? '')) !== 'socio') {
             return response()->json([
                 'ok'   => false,
@@ -58,17 +63,10 @@ class AuthController extends Controller
             ], 403);
         }
 
-        $estado     = $user->estado_registro ?? $user->estado ?? null;
-        $estadoNorm = $estado ? mb_strtolower($estado) : null;
-        $aprobado   = in_array($estadoNorm, ['aprobado','aprobada','ok','activo','activa'], true);
-
-        if (!$aprobado) {
-            return response()->json([
-                'ok'     => false,
-                'error'  => 'Usuario no aprobado aún.',
-                'estado' => $estado ?? 'pendiente',
-            ], 403);
-        }
+        // NOTA: ya no bloqueamos login por estado.
+        // El front mostrará "gates" (perfil/aporte) según el estado.
+        $estado     = $user->estado_registro ?? $user->estado ?? 'pendiente';
+        $estadoNorm = mb_strtolower((string)$estado);
 
         $token = $user->createToken('socio-token', ['socio'])->plainTextToken;
 
@@ -78,7 +76,7 @@ class AuthController extends Controller
             'user'  => [
                 'id'         => $user->id ?? null,
                 'rol'        => 'socio',
-                'estado'     => $estadoNorm ?? 'aprobado',
+                'estado'     => $estadoNorm,
                 'ci_usuario' => $user->ci_usuario,
                 'email'      => $user->email,
                 'nombre'     => $user->nombre
@@ -93,14 +91,14 @@ class AuthController extends Controller
         $u = $request->user();
         if (!$u) return response()->json(['ok' => false], 401);
 
-        $estado = $u->estado_registro ?? $u->estado ?? 'aprobado';
+        $estado = $u->estado_registro ?? $u->estado ?? 'pendiente';
 
         return response()->json([
             'ok'   => true,
             'user' => [
                 'id'         => $u->id ?? null,
                 'rol'        => 'socio',
-                'estado'     => $estado,
+                'estado'     => mb_strtolower((string)$estado),
                 'ci_usuario' => $u->ci_usuario ?? null,
                 'email'      => $u->email ?? null,
                 'nombre'     => $u->nombre
